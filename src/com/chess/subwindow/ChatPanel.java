@@ -1,79 +1,125 @@
-package com.chess.subwindow ;
+package com.chess.subwindow;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.net.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import javax.swing.*;
+import javax.swing.border.*;
+import com.chess.mainwindow.game.board.*; // Import Board class
+import com.chess.mainwindow.game.*;      // Import Game class
 
-import com.chess.mainwindow.game.board.* ;
-import com.chess.main.Main ;
-import com.chess.mainwindow.game.* ;
+public class ChatPanel extends JPanel implements Runnable {
+    private JTextArea incoming;
+    private JTextField outgoing;
+    private BufferedReader reader;
+    private PrintWriter writer;
+    private JLabel statusLabel;
+    private static final Color CHAT_BG = new Color(245, 245, 247);
+    private static final Color MESSAGE_BG = new Color(255, 255, 255);
+    private static final Color ACCENT_COLOR = new Color(0, 122, 255);
 
-import javax.swing.* ;
+    // Font size constants
+    private static final int CHAT_FONT_SIZE = 18;
+    private static final int STATUS_FONT_SIZE = 14;
+    private static final int BUTTON_FONT_SIZE = 16;
 
-public class ChatPanel extends JPanel implements Runnable{
-  
-  JTextArea incoming;
-  JTextField outgoing;
-  BufferedReader reader;
-  PrintWriter writer;
-
-  public ChatPanel(PrintWriter writer){
-    setPreferredSize(new Dimension(350, Board.SQUARE_SIZE * Board.MAX_ROW));
-    setBackground(Color.WHITE);
-    this.writer = writer ;
-    Game.chatpanel = this ;
-  }
-
-  public void launchClient(){
-    Thread thread = new Thread(this) ;
-    thread.start() ;
-  }
-
-
-  public class SendButtonListener implements ActionListener {
-    public void actionPerformed(ActionEvent ev) {
-      try {
-          String out = outgoing.getText() ;
-          incoming.append(out + "\n");
-          writer.println("c/" + out);
-          writer.flush();
-      } catch (Exception ex) {
-          ex.printStackTrace();
-      }
-      outgoing.setText("");
-      outgoing.requestFocus();
+    public ChatPanel(PrintWriter writer) {
+        this.writer = writer;
+        // Use Board class for sizing
+        setPreferredSize(new Dimension(350, Board.SQUARE_SIZE * Board.MAX_ROW));
+        setBackground(CHAT_BG);
+        setBorder(new EmptyBorder(10, 10, 10, 10));
+        Game.chatpanel = this; // Assign to Game.chatpanel
+        initializeUI();
     }
-  }
 
-  public void IncomingReader(String message){
-    System.out.println("read " + message);
-    incoming.append(message + "\n");
-  }
+    private void initializeUI() {
+        setLayout(new BorderLayout(0, 10));
 
-  public void run(){
-    
-    incoming = new JTextArea(15, 15);
-    incoming.setLineWrap(true);
-    incoming.setWrapStyleWord(true);
-    incoming.setEditable(false);
+        // Status Label
+        statusLabel = new JLabel("Chat Connected");
+        statusLabel.setFont(new Font("Arial", Font.PLAIN, STATUS_FONT_SIZE));
+        statusLabel.setForeground(Color.GRAY);
+        add(statusLabel, BorderLayout.NORTH);
 
-    JScrollPane qScroller = new JScrollPane(incoming);
-    qScroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-    qScroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        // Chat Area
+        incoming = new JTextArea();
+        incoming.setFont(new Font("Arial", Font.PLAIN, CHAT_FONT_SIZE));
+        incoming.setLineWrap(true);
+        incoming.setWrapStyleWord(true);
+        incoming.setEditable(false);
+        incoming.setBackground(MESSAGE_BG);
+        incoming.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-    outgoing = new JTextField(20);
-    JButton sendButton = new JButton("Send");
-    sendButton.addActionListener(new SendButtonListener());
+        JScrollPane scrollPane = new JScrollPane(incoming);
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        add(scrollPane, BorderLayout.CENTER);
 
-    this.add(qScroller);
-    this.add(outgoing);
-    this.add(sendButton);
+        // Input Panel
+        JPanel inputPanel = new JPanel(new BorderLayout(5, 0));
+        inputPanel.setBackground(CHAT_BG);
 
-  }
+        outgoing = new JTextField();
+        outgoing.setFont(new Font("Arial", Font.PLAIN, CHAT_FONT_SIZE));
+        outgoing.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 200, 200)),
+            BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+
+        JButton sendButton = new JButton("Send");
+        sendButton.setFont(new Font("Arial", Font.BOLD, BUTTON_FONT_SIZE));
+        sendButton.setBackground(ACCENT_COLOR);
+        sendButton.setForeground(Color.WHITE);
+        sendButton.setFocusPainted(false);
+        sendButton.setBorderPainted(false);
+        sendButton.setOpaque(true);
+        sendButton.addActionListener(new SendButtonListener());
+
+        inputPanel.add(outgoing, BorderLayout.CENTER);
+        inputPanel.add(sendButton, BorderLayout.EAST);
+        add(inputPanel, BorderLayout.SOUTH);
+    }
+
+    public void launchClient() {
+        Thread thread = new Thread(this);
+        thread.start();
+    }
+
+    public class SendButtonListener implements ActionListener {
+        public void actionPerformed(ActionEvent ev) {
+            try {
+                String message = outgoing.getText().trim();
+                if (!message.isEmpty()) {
+                    String timestamp = new SimpleDateFormat("HH:mm").format(new Date());
+                    String formattedMessage = String.format("[%s] %s", timestamp, message);
+                    incoming.append(formattedMessage + "\n");
+                    writer.println("c/" + message);
+                    writer.flush();
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                statusLabel.setText("Error sending message");
+                statusLabel.setForeground(Color.RED);
+            }
+            outgoing.setText("");
+            outgoing.requestFocus();
+        }
+    }
+
+    public void IncomingReader(String message) {
+        String timestamp = new SimpleDateFormat("HH:mm").format(new Date());
+        String formattedMessage = String.format("[%s] %s", timestamp, message);
+        SwingUtilities.invokeLater(() -> {
+            incoming.append(formattedMessage + "\n");
+            incoming.setCaretPosition(incoming.getDocument().getLength());
+        });
+    }
+
+    public void run() {
+        // UI already initialized in constructor
+    }
 }

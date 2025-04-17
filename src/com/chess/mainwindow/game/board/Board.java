@@ -10,8 +10,8 @@ public class Board {
   public static final int SQUARE_SIZE = 120;
   public static final int MAX_COL = 8;
   public static final int MAX_ROW = 8;
-  private final Color DARK = new Color(118, 150, 86);
-  private final Color LIGHT = new Color(238, 238, 210);
+  private final Color DARK = new Color(181, 136, 99);   // medium brown
+private final Color LIGHT = new Color(240, 217, 181); // light beige
   public ChessPiece state[][] = new ChessPiece[8][8];
   public ArrayList<ChessPiece> pieces;
   public boolean blackCheck = false;
